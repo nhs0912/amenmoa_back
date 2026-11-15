@@ -1,0 +1,9 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/amenmoa}
+    username: ${DB_USERNAME:amenmoa}
+    password: ${DB_PASSWORD:amenmoa}
+
+logging:
+  level:
+    com.moa.amenmoa: DEBUG
