@@ -41,3 +41,7 @@ PORT=8080
 개발은 애플리케이션 DEBUG 로그, 스테이징과 운영은 INFO 로그를 사용합니다.
 Flyway와 JPA 동작은 Spring Boot 기본값을 유지합니다.
 테스트의 MySQL Testcontainers 설정은 Docker 실행이 필요합니다.
+
+## API 명세
+
+구현 범위와 요청·응답 계약은 [백엔드 API 명세서](docs/API_SPEC.md)를 참고하세요. P0는 회원·온보딩, P1은 개인 기능, P2는 후속 공동체 기능입니다.
