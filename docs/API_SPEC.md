@@ -1,22 +1,22 @@
 # 아멘모아 백엔드 API 명세서
 
 - 버전: 0.1 / 작성일: 2026-11-16
-- 상태: **구현 전 제안 계약**. 아래 경로는 현재 동작하는 API를 의미하지 않는다.
+- 상태: **이메일 인증 기본 흐름 구현, 나머지는 제안 계약**. 구현된 인증 경로와 응답은 [이메일 인증 안내](AUTH.md)를 기준으로 한다.
 - 대상: Flutter 앱 ↔ Spring Boot API / MySQL
-- 기준: 프런트 README, `lib/features/auth`, `lib/features/experience/experience.dart`의 현재 화면·모델. 백엔드는 앱 진입점과 환경 설정만 있는 상태를 기준으로 한다.
-- 범위: P0·P1은 구현할 요청·응답 계약, P2는 후속 설계용 API 목록이다.
+- 기준: 프런트 README, `lib/features/auth`, `lib/features/experience/experience.dart`의 현재 화면·모델과 백엔드의 이메일 인증 코드.
+- 범위: P0의 이메일 인증은 현재 계약과 전환 과제를 함께 정리한다. 나머지 P0·P1은 구현할 계약, P2는 후속 설계용 API 목록이다.
 
 ## 1. 현재 상태와 설계 방향
 
 | 영역 | 현재 앱 | 백엔드 구현 방향 |
 | --- | --- | --- |
-| 이메일 가입·인증·로그인·세션 | Supabase SDK 사용 | Supabase 유지. Spring에서 비밀번호나 refresh token을 받지 않음 |
-| 이메일 중복 확인 | 인터페이스만 존재, 실제 가입 차단 | 공개 중복 확인 API 구현 |
-| 닉네임 | Supabase user_metadata 저장, 중복 API 미연결 | MySQL 고유 닉네임을 기준으로 조회·저장 통합 |
+| 이메일 가입·인증·로그인·세션 | Supabase SDK 사용 | Spring 이메일 가입·로그인·갱신·로그아웃 구현. 이메일 확인과 Flutter 전환은 후속 작업 |
+| 이메일 중복 확인 | 백엔드 API 미연결 | 공개 중복 확인 API 구현 |
+| 닉네임 | Supabase user_metadata 저장, 중복 API 미연결 | 가입 시 MySQL에 고유 닉네임 저장, 공개 중복 확인 제공. 이후 수정은 후속 작업 |
 | 기도 기록·제목·예약·선호 | 계정별 로컬 저장 | 사용자별 영구 저장과 조회 |
 | 그룹·공동 목표·라이브·친구 | 로컬 데이터 또는 예시 | P2에서 권한·실시간 정책 확정 후 구현 |
 
-**설계 가정:** 인증 제공자는 기존 Supabase를 유지한다. 자체 Spring 인증으로 교체하는 요구가 생기면 회원가입·메일 발송·코드 검증·토큰 발급/갱신·로그아웃 계약을 별도로 설계해야 한다.
+**인증 전환:** Spring의 인증 API를 아멘모아 백엔드 기능으로 개발한다. 현재 Flutter의 Supabase 연결을 전환하기 전 이메일 인증과 닉네임 수집 시점을 맞추고 기존 사용자 및 데이터 이전 방식을 확정한다.
 
 ### 구현 우선순위
 
@@ -33,10 +33,10 @@
 - 기본 경로: `/api/v1`. 호스트는 local/dev/staging/prod 배포별로 설정한다. 실제 도메인은 미정이다.
 - 로컬 예시: `http://localhost:8080/api/v1`
 - JSON 요청·응답: `Content-Type: application/json`, UTF-8, 필드명 camelCase.
-- 아래에서 `공개`로 표기한 API 외에는 `Authorization: Bearer <Supabase access token>` 필수.
+- 아래에서 `공개`로 표기한 API 외에는 전환 후 Spring이 발급한 `Authorization: Bearer <accessToken>`을 사용한다.
 - 서버는 서명·허용 알고리즘·issuer·audience·만료를 검증한다. 단순 JWT decode 결과나 클라이언트의 userId를 신뢰하지 않는다.
-- JWT `sub`를 인증 사용자 식별자로 사용한다. Supabase의 서버 측 사용자 조회로 이메일 인증 완료 여부를 확인한다. 검증 실패는 401, 미인증 이메일은 403 `EMAIL_NOT_VERIFIED`.
-- 닉네임 설정 전에도 P0 인증 API를 사용할 수 있다. P1은 프로필 온보딩 완료가 필요하며 미완료면 403 `PROFILE_INCOMPLETE`.
+- Spring JWT의 `sub`는 MySQL 계정 ID를 문자열로 담는다. 토큰 검증 실패는 401이다. 이메일 소유 확인과 미인증 계정의 로그인 차단은 공개 서비스 전환 조건이다.
+- 현재 인증 API는 가입 시 닉네임을 받는다. P1은 프로필 온보딩 완료가 필요하며 미완료면 403 `PROFILE_INCOMPLETE`로 응답하는 방안을 검토한다.
 - 사용자 ID·작성자·소유자는 서버가 결정한다. 개인 리소스는 본인만 접근한다. 다른 사용자의 ID와 존재하지 않는 ID 모두 404로 응답한다.
 - 모든 응답에 `X-Request-Id`를 부여한다. 오류 본문 requestId와 동일하다.
 - 운영 CORS는 허용한 프런트 origin만 허용한다. 인증 토큰·메일·기도 본문·비밀번호를 로그에 남기지 않는다.
@@ -45,7 +45,7 @@
 
 | 종류 | 규칙 |
 | --- | --- |
-| ID | 서버 UUID 문자열. userId는 인증 제공자의 sub UUID |
+| ID | 현재 인증 API의 `id`는 숫자이고 JWT의 `sub`는 같은 ID를 문자열로 담는다. P1 리소스 ID는 UUID 문자열을 사용한다. |
 | 타임스탬프 | RFC 3339 UTC, 예: `2026-11-16T00:00:00Z` |
 | 날짜 | `YYYY-MM-DD`. 날짜 경계는 사용자의 저장된 IANA timeZone 기준 |
 | timeZone | 기본 `Asia/Seoul`, 유효한 IANA 이름만 허용 |
@@ -57,6 +57,8 @@
 성공은 자원을 직접 반환한다(별도 data 래퍼 없음). 생성 201 + `Location`, 조회·수정 200, 삭제 204(본문 없음). 명시된 PUT upsert는 생성 201/재조회 200이다.
 
 ### 2.3 목록·오류
+
+아래 오류 구조와 요청 ID, 생성 응답의 `Location` 헤더는 후속 공통 계약이다. 현재 인증 API의 응답과 오류 코드는 [이메일 인증 안내](AUTH.md)를 참고한다.
 
 목록 쿼리: `limit` 기본 20, 1~100 / `cursor` 선택. 서버 발급 불투명 cursor만 허용한다. 기본 정렬은 `(createdAt DESC, id DESC)`이며 기록은 `(prayedOn DESC, createdAt DESC, id DESC)`이다. cursor는 사용자·필터·정렬에 바인딩하며 변조/다른 조건 재사용은 400이다.
 
@@ -96,7 +98,7 @@ fieldErrors는 검증 오류에서만 배열로 반환하며 다른 오류에서
 
 ### 3.1 이메일 중복 확인
 
-`POST /auth/email-availability` · 공개 · 200
+`POST /auth/email-availability` · 공개 · 200 · 구현
 
 ```json
 {"email": "member@example.com"}
@@ -106,73 +108,58 @@ fieldErrors는 검증 오류에서만 배열로 반환하며 다른 오류에서
 {"available": true}
 ```
 
-- email 필수, trim 후 최대 254자, 이메일 형식 검증. 도메인은 소문자화하고 로컬 파트는 보존한다. 최종 비교는 인증 제공자의 계정 동일성 기준을 따르며 별도 MySQL 회원 테이블만으로 판정하지 않는다.
-- 인증 제공자에 미인증 가입 계정이 있어도 `available:false`. 중복은 오류가 아니라 200/false.
-- 계정 생성·가입 API 호출·메일 발송을 부작용으로 수행하지 않는다. 제공자의 관리 권한 조회는 서버 전용 비밀키로만 실행한다.
-- 구현 선행조건: 인증 제공자의 정규화 규칙과 기존 계정의 정확한 조회 방식을 확인한다. 신규 가입·계정 삭제 이벤트 및 누락 보정을 포함한 이메일 인덱스 또는 정확한 서버 조회가 준비되지 않으면 503으로 실패시킨다. 전체 사용자 목록을 요청마다 순회하지 않는다.
-- 명시적 중복 응답은 계정 존재 유출 가능성이 있다. 출시 전 공개 여부·봇 방지 정책을 확정한다. 이 문서는 현재 앱의 명시적 중복 확인 UX를 기준으로 한다.
-- 최종 가입 중복은 Supabase 가입 처리에서 다시 보장한다. 조회는 이메일 예약이 아니다.
-- 프런트 연결: `EmailAvailabilityChecker.check`에서 true→available, false→taken, 네트워크/429/5xx→unavailable. 오류를 사용 가능으로 표시하지 않는다.
+- 이메일은 앞뒤 공백을 제거하고 전체를 소문자로 바꾼 뒤 MySQL 계정에서 조회한다. 최대 254자이며 이메일 형식이어야 한다.
+- 조회는 계정을 생성하거나 메일을 발송하지 않는다. 가입할 때는 MySQL UNIQUE 제약이 중복을 막는다.
+- 공개 경로는 가입 여부를 노출할 수 있어 전환 전에 공개 여부와 요청 제한을 확정한다.
+- 프런트는 true를 사용 가능, false를 중복, 네트워크 오류와 429·5xx를 확인 실패로 처리한다.
 
-### 3.2 내 프로필 조회·초기 생성
+### 3.2 내 프로필 조회
 
-`GET /me` · 인증 · 200
+`GET /me` · 인증 · 200 · 구현
 
 ```json
 {
-  "userId": "7d05d54b-b5e9-499b-a349-20a0ef81b5db",
+  "id": 42,
   "email": "member@example.com",
-  "emailVerified": true,
-  "nickname": null,
-  "onboardingRequired": true,
-  "createdAt": "2026-11-16T00:00:00Z",
-  "updatedAt": "2026-11-16T00:00:00Z"
+  "nickname": "기도하는모아"
 }
 ```
 
-- 검증된 인증 계정의 최초 요청에서 MySQL 프로필·기본 설정을 원자적으로 생성한다. userId unique로 동시 첫 요청을 중복 생성하지 않는다.
-- email/emailVerified는 인증 제공자의 검증된 정보만 사용한다. 요청 본문으로 변경할 수 없다.
-- nickname이 없으면 null, onboardingRequired=true. 프런트는 닉네임 입력으로 이동한다.
-- 이전 metadata.nickname은 자동으로 확정하지 않는다. 중복 가능한 기존 이름은 닉네임 마이그레이션 절차를 거쳐야 한다.
+JWT의 `sub`로 가입 시 생성한 계정을 조회한다. 이메일 확인 여부와 추가 온보딩 정보는 별도 상태가 필요해지는 시점에 계약을 확장한다.
 
 ### 3.3 닉네임 중복 확인
 
-`POST /users/nickname-availability` · 인증 · 200
+`POST /users/nickname-availability` · 공개 · 200 · 구현
 
 ```json
 {"nickname": "기도하는모아"}
 ```
 
 ```json
-{"available": true, "normalizedNickname": "기도하는모아"}
+{"available": true}
 ```
 
-- trim → Unicode NFC 정규화 → 2~20 grapheme 검증. 프런트 `validateNickname`과 동일한 제어·숨김 문자 범위(U+0000~001F, 007F~009F, 200B, 200E~200F, 202A~202E, 2060~206F, FEFF)를 거부한다.
-- 표시명은 위 정규화 값을 저장한다. 중복 비교 키는 NFC 표시명에 Unicode 기본 full case folding을 적용한다. Unicode 버전을 고정하고 MySQL의 기본 collation에 판정을 맡기지 않는다.
-- 내부 공백은 보존한다. `모아`/` 모아 `는 동일, `Moa`/`moa`는 동일, `모 아`/`모아`는 서로 다르다.
-- 본인의 현재 닉네임은 available=true. 중복 확인은 예약이 아니며 저장 시 다시 판정한다.
-- 프런트 연결: `NicknameAvailabilityChecker.check`. 미온보딩 사용자도 호출 가능하다.
+- 앞뒤 공백 제거 → Unicode NFC → 화면상 문자 2~20자 검증 순서로 처리한다. 지정한 제어·숨김 문자 범위를 거부한다.
+- 정규화된 표시명을 저장하고, 대소문자를 구분하지 않는 정규화 비교 키로 중복을 판단한다.
+- 중복 확인은 예약이 아니며, 가입 요청에서도 중복을 확인하고 DB UNIQUE 제약을 적용한다.
 
-### 3.4 닉네임 설정·변경
+### 3.4 닉네임 변경
 
-`PATCH /me` · 인증 · 200
+`PATCH /me` · 인증 · 200 · 후속 제안
 
 ```json
 {"nickname": "기도하는모아"}
 ```
 
-응답: 3.2의 전체 프로필 객체. nickname은 저장된 정규화 값, onboardingRequired=false.
+- 3.3과 같은 정규화 및 중복 규칙을 적용한다. 자신의 기존 닉네임은 그대로 저장할 수 있다.
+- 성공 응답으로 변경된 계정 정보를 반환하고, 앱의 메모리와 저장된 프로필을 갱신한다.
+- 기존 Supabase 닉네임은 계정 이전 시 중복을 해소해 MySQL에 저장한다.
 
-- nickname 필수·null 금지. 3.3과 같은 규칙 적용. 동일한 현재 이름 재저장은 200.
-- 최종 닉네임 비교 키에 DB UNIQUE 제약을 두어 조회-저장 사이 경합을 차단한다. 중복 저장은 409 `NICKNAME_TAKEN`.
-- 성공 응답을 받기 전에 앱을 홈으로 보내지 않는다. 새 프로필 값을 메모리·저장 세션에 반영한다.
-- **전환 후 MySQL 프로필을 단일 기준으로 사용한다.** Supabase metadata와 동시 쓰기를 필수로 하지 않는다. 기존 `saveNickname`의 Supabase updateUser 호출을 이 API로 교체하고, 자동 로그인에서도 GET /me로 이름을 조회해야 한다.
+### 3.5 가입·로그인·세션
 
-### 3.5 인증 처리 경계
+Spring에 가입, 로그인, 토큰 갱신, 현재 세션 로그아웃 API가 구현되어 있다. 정확한 요청/응답과 토큰 유효 기간은 [이메일 인증 안내](AUTH.md)를 참고한다.
 
-Spring에 `/login`, `/signup`, `/refresh`를 중복 구현하지 않는다. 이메일 인증 링크/8자리 코드, 가입·로그인, 재전송 대기 60초, 세션 복원·갱신은 기존 Supabase 경로를 사용한다. 로그아웃은 현재 기기의 저장 세션을 제거하는 기존 동작을 유지하며 모든 기기 로그아웃으로 확대하지 않는다.
-
-SNS 로그인·비밀번호 재설정은 아직 제품 연결 전이다. 공급자 설정과 리다이렉트 계약을 확정한 다음 별도 문서로 추가한다.
+현재 Flutter는 인증 링크 또는 코드 확인 후 닉네임을 설정한다. 전환 전에 Spring의 이메일 확인·재전송과 미인증 계정의 로그인 차단을 구현하고 닉네임 수집 시점을 맞춘다. 비밀번호 재설정, 요청 제한, 기존 계정·세션·데이터 이전은 전환 작업에 포함한다. 모든 기기 로그아웃과 SNS 로그인은 후속 설계다.
 
 ## 4. P1 — 개인 기도제목
 
@@ -372,31 +359,31 @@ P1 예약은 개인 단발 예약이다. 반복·그룹 초대·알림 발송 �
 
 ### 연결 순서
 
-1. 환경별 API base URL 주입. Supabase 키와 API URL을 혼동하지 않는다.
-2. 이메일 중복 checker 연결 → 가입 차단 해제.
-3. 로그인/세션 복원 후 GET /me → 닉네임 여부 판정.
-4. 닉네임 checker와 PATCH /me 연결 → Supabase metadata 기반 저장/복원 교체.
+1. 서버의 이메일 확인·비밀번호 재설정·요청 제한을 준비하고 기존 계정 및 사용자 데이터 이전 방식을 확정한다.
+2. 환경별 API base URL을 설정하고 이메일·닉네임 중복 확인을 연결한다.
+3. 가입·이메일 확인·닉네임 수집 흐름을 맞춘 뒤 Flutter 로그인·세션 복원과 GET /me를 연결한다.
+4. 닉네임을 변경할 수 있게 할 때 PATCH /me를 구현하고 프로필 화면에 연결한다.
 5. 계정별 기록·제목·예약·설정 저장소 구현. 로그인 계정 전환 시 캐시를 userId별로 분리.
 6. 기존 기록 가져오기는 사용자 동의 및 UUID 매핑 후 수행. 오프라인 쓰기는 실패 상태와 재시도를 표시.
-7. 401은 기존 인증 저장소로 갱신을 단일 실행하고 1회 재시도. 503/네트워크 실패는 로그아웃시키거나 성공으로 대체하지 않음.
+7. 보호 API의 401 응답에는 갱신을 한 번만 실행하고 원래 요청을 1회 재시도한다. 503·네트워크 실패에서는 저장된 세션을 유지한다.
 
 ### 최소 DB 구조
 
 | 테이블 | 핵심 제약 |
 | --- | --- |
-| users | id=인증 sub PK, nickname nullable, nickname_key UNIQUE, created_at/updated_at |
+| accounts (구현) | 숫자 id PK, email UNIQUE, nickname, nickname_key UNIQUE, password_hash, created_at |
 | user_settings | user_id PK/FK, text_scale, meeting_reminders_enabled, time_zone |
 | prayer_topics | id PK, user_id FK, title/content, timestamps, (user_id, created_at, id) 인덱스 |
 | prayer_records | 내부 PK 또는 복합 PK, UNIQUE(user_id, client_record_id), topic_id FK nullable, title 스냅샷, 날짜·초·source·kind·시간대·메모·타임스탬프·삭제 표시 |
 | prayer_schedules | id PK, user_id FK, title, scheduled_at, time_zone, duration_seconds, timestamps |
 
-Flyway migration으로 생성한다. 기록 인덱스는 `(user_id, prayed_on, created_at, id)`, 예약은 `(user_id, scheduled_at, id)`를 기본으로 검토한다. 닉네임 unique 위반은 HTTP 409로 변환한다. 이메일 중복 인덱스를 도입할 경우 Auth 이벤트 누락·재처리·계정 삭제 보정을 설계한 후 추가한다.
+Flyway 마이그레이션으로 생성한다. 회원 FK는 `accounts.id`를 참조하는 방향으로 설계한다. 기록 인덱스는 `(user_id, prayed_on, created_at, id)`, 예약은 `(user_id, scheduled_at, id)`를 기본으로 검토한다.
 
 ### 구현 완료 판정 시나리오
 
 - [ ] 토큰 없음·위조·만료·잘못된 issuer/audience 차단, 이메일 미인증 차단.
-- [ ] 최초 /me 동시 요청 시 사용자 한 명만 생성, 닉네임 없는 계정은 온보딩으로 이동.
-- [ ] 이메일 중복 조회에서 메일 발송·계정 생성 없음, 인증 서비스 장애를 available=true로 반환하지 않음.
+- [ ] 동일한 이메일 또는 닉네임으로 가입 요청이 동시에 도착해도 계정은 한 건만 생성된다.
+- [ ] 이메일 중복 조회가 메일 발송이나 계정 생성을 유발하지 않으며, 조회 장애 시 available=true를 반환하지 않는다.
 - [ ] 한글·조합 이모지 닉네임 길이, NFC·대소문자 중복, 본인 이름 유지, 동시 저장 한 요청만 성공.
 - [ ] A 계정으로 B의 제목·기록·예약을 조회·삭제할 수 없음. 목록도 누출 없음.
 - [ ] 기록 PUT 재시도 한 번만 합산, 다른 payload 409, 삭제 후 오래된 PUT으로 부활하지 않음.
@@ -407,6 +394,6 @@ Flyway migration으로 생성한다. 기록 인덱스는 `(user_id, prayed_on, c
 
 ## 10. 확정이 필요한 항목
 
-이 문서의 길이 제한·rate limit·이메일/닉네임 정규화·기록 날짜 귀속·오프라인 가져오기 정책은 제안값이다. 구현 시작 전 팀 기준으로 확정한다. 운영 도메인, 인증 issuer/audience, 이메일 조회 연동 방식, 기존 metadata 닉네임 이관, 개인정보 보관·탈퇴 정책은 별도 확정이 필요하다.
+후속 기능의 제한과 데이터 정책은 구현 전에 확정한다. 공개 전환에 필요한 항목은 운영 도메인, 메일 전달 및 확인 방식, 공개 중복 확인 정책, 기존 Supabase 계정과 닉네임 이전, 개인정보 보관·탈퇴 정책이다.
 
 P0·P1 구현 후 `docs/openapi.yaml` 또는 생성된 OpenAPI를 이 명세와 함께 관리한다. 이 문서 작성만으로 Swagger·컨트롤러·DB·인증 연동이 구현되는 것은 아니다.

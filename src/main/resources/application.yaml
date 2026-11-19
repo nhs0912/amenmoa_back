@@ -3,6 +3,13 @@ spring:
     name: amenmoa-api
   profiles:
     default: local
+  data:
+    redis:
+      url: ${AUTH_REDIS_URL}
+      connect-timeout: 2s
+      timeout: 2s
+      repositories:
+        enabled: false
   jpa:
     hibernate:
       ddl-auto: validate
@@ -14,3 +21,9 @@ spring:
 server:
   port: ${PORT:8080}
 
+amenmoa:
+  auth:
+    issuer: urn:amenmoa:auth
+    audience: amenmoa-api
+    # 환경마다 다른 서명 키를 환경변수로 주입합니다.
+    secret: ${AUTH_JWT_SECRET}

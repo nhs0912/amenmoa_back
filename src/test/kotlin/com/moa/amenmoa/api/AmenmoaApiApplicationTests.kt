@@ -5,7 +5,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
 
 @Import(TestcontainersConfiguration::class)
-@SpringBootTest
+@SpringBootTest(properties = ["amenmoa.auth.secret=test-only-signing-key-at-least-32-bytes"])
 class AmenmoaApiApplicationTests {
 
 	@Test

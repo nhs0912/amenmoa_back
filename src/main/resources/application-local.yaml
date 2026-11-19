@@ -1,4 +1,7 @@
 spring:
+  data:
+    redis:
+      url: ${AUTH_REDIS_URL:redis://127.0.0.1:6379}
   datasource:
     url: jdbc:mysql://localhost:3306/amenmoa?sslMode=DISABLED&allowPublicKeyRetrieval=true&connectionTimeZone=UTC
     username: amenmoa

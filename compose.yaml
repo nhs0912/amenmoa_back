@@ -14,5 +14,15 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_0900_ai_ci
 
+  redis:
+    image: redis:7.4-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    # 컨테이너를 다시 띄워도 세션과 만료 시각을 복원할 수 있습니다.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+
 volumes:
   mysql_data:
+  redis_data:
