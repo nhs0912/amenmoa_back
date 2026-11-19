@@ -12,7 +12,7 @@ import java.time.Instant
 /** MySQL에 저장하는 회원 정보. API에서는 필요한 필드만 별도 DTO로 반환한다. */
 @Entity
 @Table(name = "accounts")
-class Account(햣
+class Account(
     @Column(nullable = false, length = 254)
     val email: String,
 
