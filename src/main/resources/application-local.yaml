@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/amenmoa}
-    username: ${DB_USERNAME:amenmoa}
-    password: ${DB_PASSWORD:amenmoa}
+    url: jdbc:mysql://localhost:3306/amenmoa?sslMode=DISABLED&allowPublicKeyRetrieval=true&connectionTimeZone=UTC
+    username: amenmoa
+    password: amenmoa_local
 
 logging:
   level:

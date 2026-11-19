@@ -3,6 +3,14 @@ spring:
     name: amenmoa-api
   profiles:
     default: local
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
 
 server:
   port: ${PORT:8080}
+

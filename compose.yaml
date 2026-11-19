@@ -1,0 +1,18 @@
+services:
+  mysql:
+    image: mysql:8.4
+    ports:
+      - "127.0.0.1:3306:3306"
+    environment:
+      MYSQL_DATABASE: amenmoa
+      MYSQL_USER: amenmoa
+      MYSQL_PASSWORD: amenmoa_local
+      MYSQL_ROOT_PASSWORD: root_local
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+
+volumes:
+  mysql_data:
